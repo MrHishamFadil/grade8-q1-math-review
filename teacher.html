@@ -14,7 +14,7 @@ tr.s{cursor:pointer}tr.s:hover{background:#eff6ff}.ok{color:#16a34a;font-weight:
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import {getFirestore,collection,getDocs,query,orderBy,limit} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import {getFirestore,collection,getDocs,query,orderBy,limit,startAfter} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 const app=initializeApp({apiKey:'AIzaSyCyAu4Vw3rPTeL4ANu4Nqtz951tA0kfvsQ',authDomain:'g8q1-math-review-qis.firebaseapp.com',projectId:'g8q1-math-review-qis',appId:'1:254440011006:web:f212934333678c1a8361af'});
 const auth=getAuth(app),db=getFirestore(app),$=id=>document.getElementById(id);
 const TABS={ov:'Overview',l12:'1.2 Translations',l13:'1.3 Reflections',l14:'1.4 Rotations',l22:'2.2 Dilations',l23:'2.3 Similar Figures',l31:'3.1 Multi-Step Eq.',l32:'3.2 Special Cases',l41:'4.1 Triangle Angles',ex:'Mixed Exam',e1:'Exam 1',e2:'Exam 2'};
@@ -26,8 +26,8 @@ $('in').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>$('m
 $('out').onclick=()=>signOut(auth);$('rf').onclick=load;
 onAuthStateChanged(auth,u=>{$('in').hidden=!!u;$('out').hidden=$('rf').hidden=$('csv').hidden=!u;$('me').textContent=u?u.email:'';if(u)load();else{$('dash').hidden=true;$('msg').hidden=false}});
 async function load(){$('msg').hidden=false;$('msg').textContent='Loading…';
-  try{const snap=await getDocs(query(collection(db,'events'),orderBy('ts','desc'),limit(20000)));
-    EV=snap.docs.map(d=>{const x=d.data();return {...x,ts:x.ts?x.ts.toDate():null}});render();$('msg').hidden=true;$('dash').hidden=false;}
+  try{let docs=[],cur=null;for(let i=0;i<40;i++){const q=cur?query(collection(db,'events'),orderBy('ts','desc'),startAfter(cur),limit(5000)):query(collection(db,'events'),orderBy('ts','desc'),limit(5000));const snap=await getDocs(q);docs=docs.concat(snap.docs);if(snap.docs.length<5000)break;cur=snap.docs[snap.docs.length-1];}
+    EV=docs.map(d=>{const x=d.data();return {...x,ts:x.ts?x.ts.toDate():null}});render();$('msg').hidden=true;$('dash').hidden=false;}
   catch(e){$('msg').textContent=e.code==='permission-denied'?'This Google account is not allowed to view the dashboard.':'Error: '+e.message}}
 function render(){
   const S={},L={};const key=e=>e.vid+'|'+e.name;
