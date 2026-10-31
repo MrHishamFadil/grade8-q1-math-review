@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Teacher dashboard · G8 Q1 Math Review</title>
+<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f1f5f9;color:#0f172a}header{background:#0f172a;color:#fff;padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}header h1{font-size:1.15rem;margin:0;flex:1}
+main{max-width:1150px;margin:auto;padding:16px}.btn{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:9px 14px;font:inherit;font-weight:700;cursor:pointer}.btn.g{background:#334155}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}.kpi{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 4px #0001}.kpi b{display:block;font-size:1.8rem}.kpi span{color:#64748b;font-size:.9rem}
+.card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 4px #0001;margin-bottom:16px;overflow-x:auto}h2{font-size:1.05rem;margin:4px 0 10px}table{border-collapse:collapse;width:100%;font-size:.92rem}th,td{padding:7px 8px;border-bottom:1px solid #e2e8f0;text-align:left;white-space:nowrap}th{background:#f8fafc;position:sticky;top:0}
+tr.s{cursor:pointer}tr.s:hover{background:#eff6ff}.ok{color:#16a34a;font-weight:700}.bad{color:#dc2626;font-weight:700}.muted{color:#64748b}#msg{padding:30px;text-align:center}select{font:inherit;padding:6px;border-radius:8px}</style></head><body>
+<header><h1>📊 Teacher dashboard · Grade 8 Q1 Math Review</h1><span id="me" class="muted"></span><button class="btn g" id="rf" hidden>↻ Refresh</button><button class="btn g" id="csv" hidden>⬇ CSV</button><button class="btn" id="in">Sign in with Google</button><button class="btn g" id="out" hidden>Sign out</button></header>
+<main><div id="msg" class="card">Sign in with your teacher Google account (hisham.abdelfadil@gmail.com) to see student activity.</div><div id="dash" hidden>
+<div class="kpis"><div class="kpi"><b id="k1">0</b><span>students</span></div><div class="kpi"><b id="k2">0</b><span>sessions (visits)</span></div><div class="kpi"><b id="k3">0</b><span>total active time</span></div><div class="kpi"><b id="k4">0</b><span>avg time per student</span></div><div class="kpi"><b id="k5">0</b><span>questions checked (✔ first try %)</span></div><div class="kpi"><b id="k6">0</b><span>videos opened</span></div></div>
+<div class="card"><h2>👩‍🎓 Students <span class="muted" style="font-weight:400">(tap a row for details)</span></h2><table id="ts"></table></div>
+<div class="card"><h2>📚 By lesson</h2><table id="tl"></table></div>
+<div class="card" id="det" hidden><h2 id="dh"></h2><table id="td"></table></div>
+<div class="card"><h2>🕒 Recent activity</h2><table id="tr"></table></div></div></main>
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {getFirestore,collection,getDocs,query,orderBy,limit} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const app=initializeApp({apiKey:'AIzaSyCyAu4Vw3rPTeL4ANu4Nqtz951tA0kfvsQ',authDomain:'g8q1-math-review-qis.firebaseapp.com',projectId:'g8q1-math-review-qis',appId:'1:254440011006:web:f212934333678c1a8361af'});
+const auth=getAuth(app),db=getFirestore(app),$=id=>document.getElementById(id);
+const TABS={ov:'Overview',l12:'1.2 Translations',l13:'1.3 Reflections',l14:'1.4 Rotations',l22:'2.2 Dilations',l23:'2.3 Similar Figures',l31:'3.1 Multi-Step Eq.',l32:'3.2 Special Cases',l41:'4.1 Triangle Angles',ex:'Mixed Exam',e1:'Exam 1',e2:'Exam 2'};
+const tn=t=>TABS[t]||t, esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fm=s=>{s=Math.round(s);if(s<60)return s+'s';const m=Math.floor(s/60);return m<60?m+'m '+(s%60)+'s':Math.floor(m/60)+'h '+(m%60)+'m'};
+const fd=d=>d?d.toLocaleString('en-GB',{timeZone:'Asia/Riyadh',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+let EV=[];
+$('in').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>$('msg').textContent='Sign-in failed: '+e.message);
+$('out').onclick=()=>signOut(auth);$('rf').onclick=load;
+onAuthStateChanged(auth,u=>{$('in').hidden=!!u;$('out').hidden=$('rf').hidden=$('csv').hidden=!u;$('me').textContent=u?u.email:'';if(u)load();else{$('dash').hidden=true;$('msg').hidden=false}});
+async function load(){$('msg').hidden=false;$('msg').textContent='Loading…';
+  try{const snap=await getDocs(query(collection(db,'events'),orderBy('ts','desc'),limit(20000)));
+    EV=snap.docs.map(d=>{const x=d.data();return {...x,ts:x.ts?x.ts.toDate():null}});render();$('msg').hidden=true;$('dash').hidden=false;}
+  catch(e){$('msg').textContent=e.code==='permission-denied'?'This Google account is not allowed to view the dashboard.':'Error: '+e.message}}
+function render(){
+  const S={},L={};const key=e=>e.vid+'|'+e.name;
+  for(const e of EV){const k=key(e);const s=S[k]||(S[k]={name:e.name,vid:e.vid,ses:new Set(),sec:0,chk:0,right:0,qs:{},vids:new Set(),tabs:{},first:e.ts,last:e.ts});
+    s.ses.add(e.sid);if(e.ts){if(!s.first||e.ts<s.first)s.first=e.ts;if(!s.last||e.ts>s.last)s.last=e.ts}
+    const t=e.tab||'';const l=L[t]||(L[t]={sec:0,stu:new Set(),chk:0,right:0,vids:0});
+    if(e.type==='time'){s.sec+=e.sec||0;l.sec+=e.sec||0;s.tabs[t]=(s.tabs[t]||0)+(e.sec||0);l.stu.add(k)}
+    if(e.type==='check'){s.chk++;l.chk++;l.stu.add(k);if(e.ok){s.right++;l.right++}
+      const q=s.qs[e.qid]||(s.qs[e.qid]={tries:0,ok:false,firstOk:null,ts:0});q.tries++;if(e.ok)q.ok=true;}
+    if(e.type==='video'){s.vids.add(t);l.vids++;l.stu.add(k)}}
+  // first-try correctness (events are newest first)
+  for(const s of Object.values(S))for(const q of Object.values(s.qs))q.firstOk=null;
+  for(const e of [...EV].reverse())if(e.type==='check'){const q=S[key(e)].qs[e.qid];if(q.firstOk===null)q.firstOk=!!e.ok}
+  const st=Object.values(S).sort((a,b)=>b.last-a.last),tot=st.reduce((a,s)=>a+s.sec,0);
+  const nq=st.reduce((a,s)=>a+Object.keys(s.qs).length,0),nf=st.reduce((a,s)=>a+Object.values(s.qs).filter(q=>q.firstOk).length,0);
+  $('k1').textContent=st.length;$('k2').textContent=new Set(EV.map(e=>e.sid)).size;$('k3').textContent=fm(tot);$('k4').textContent=fm(st.length?tot/st.length:0);
+  $('k5').textContent=EV.filter(e=>e.type==='check').length+(nq?' ('+Math.round(100*nf/nq)+'%)':'');$('k6').textContent=EV.filter(e=>e.type==='video').length;
+  $('ts').innerHTML='<tr><th>Student</th><th>Visits</th><th>Active time</th><th>Questions tried</th><th>Solved</th><th>Right 1st try</th><th>Checks ✔/✘</th><th>Videos</th><th>Most time on</th><th>First seen</th><th>Last seen</th></tr>'+st.map((s,i)=>{const qs=Object.values(s.qs);const top=Object.entries(s.tabs).sort((a,b)=>b[1]-a[1])[0];
+    return `<tr class="s" data-i="${i}"><td><b>${esc(s.name)}</b></td><td>${s.ses.size}</td><td>${fm(s.sec)}</td><td>${qs.length}</td><td>${qs.filter(q=>q.ok).length}</td><td>${qs.filter(q=>q.firstOk).length}</td><td><span class="ok">${s.right}</span> / <span class="bad">${s.chk-s.right}</span></td><td>${[...s.vids].map(tn).join(', ')||'—'}</td><td>${top?tn(top[0])+' ('+fm(top[1])+')':'—'}</td><td>${fd(s.first)}</td><td>${fd(s.last)}</td></tr>`}).join('');
+  $('ts').querySelectorAll('tr.s').forEach(r=>r.onclick=()=>detail(st[+r.dataset.i]));
+  $('tl').innerHTML='<tr><th>Tab</th><th>Students</th><th>Active time</th><th>Checks</th><th>Correct %</th><th>Video plays</th></tr>'+Object.keys(TABS).filter(t=>L[t]).map(t=>{const l=L[t];return `<tr><td>${tn(t)}</td><td>${l.stu.size}</td><td>${fm(l.sec)}</td><td>${l.chk}</td><td>${l.chk?Math.round(100*l.right/l.chk)+'%':'—'}</td><td>${l.vids}</td></tr>`}).join('');
+  $('tr').innerHTML='<tr><th>Time (Riyadh)</th><th>Student</th><th>Activity</th><th>Tab</th><th>Detail</th></tr>'+EV.slice(0,150).map(e=>`<tr><td>${fd(e.ts)}</td><td>${esc(e.name)}</td><td>${{start:'▶ opened site',end:'⏹ left',time:'⏱ time',check:'✏ checked answer',video:'🎬 played video',name:'👤 set name'}[e.type]||e.type}</td><td>${tn(e.tab||'')}</td><td>${e.type==='check'?esc(e.qid)+' '+(e.ok?'<span class="ok">✔</span>':'<span class="bad">✘</span>'):e.type==='time'?fm(e.sec):''}</td></tr>`).join('');
+}
+function detail(s){$('det').hidden=false;$('dh').textContent='🔎 '+s.name+' — question by question';
+  const rows=Object.entries(s.qs).sort();$('td').innerHTML='<tr><th>Question</th><th>Lesson</th><th>Tries</th><th>Result</th></tr>'+rows.map(([q,v])=>`<tr><td>${esc(q)}</td><td>${tn(q.replace(/q\d+$/,''))}</td><td>${v.tries}</td><td>${v.ok?(v.firstOk?'<span class="ok">✔ first try</span>':'<span class="ok">✔ after retries</span>'):'<span class="bad">✘ not yet</span>'}</td></tr>`).join('')
+   +'<tr><th colspan="4">Time per tab: '+Object.entries(s.tabs).map(([t,v])=>tn(t)+' '+fm(v)).join(' · ')+'</th></tr>';$('det').scrollIntoView({behavior:'smooth'})}
+$('csv').onclick=()=>{const h=['time_riyadh','student','visitor','session','type','tab','question','correct','seconds'];
+  const c=[h.join(',')].concat(EV.map(e=>[fd(e.ts),e.name,e.vid,e.sid,e.type,e.tab,e.qid||'','ok' in e?e.ok:'',e.sec||''].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c.join('\n')],{type:'text/csv'}));a.download='g8q1-activity.csv';a.click()};
+</script></body></html>
